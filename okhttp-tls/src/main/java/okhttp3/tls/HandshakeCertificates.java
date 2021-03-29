@@ -22,6 +22,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
 import javax.annotation.Nullable;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
@@ -29,6 +30,7 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
+
 import okhttp3.CertificatePinner;
 import okhttp3.internal.Util;
 import okhttp3.internal.platform.Platform;
@@ -79,94 +81,96 @@ import static okhttp3.tls.internal.TlsUtil.newTrustManager;
  * </ul>
  */
 public final class HandshakeCertificates {
-  private final X509KeyManager keyManager;
-  private final X509TrustManager trustManager;
+    private final X509KeyManager keyManager;
+    private final X509TrustManager trustManager;
 
-  private HandshakeCertificates(X509KeyManager keyManager, X509TrustManager trustManager) {
-    this.keyManager = keyManager;
-    this.trustManager = trustManager;
-  }
-
-  public X509KeyManager keyManager() {
-    return keyManager;
-  }
-
-  public X509TrustManager trustManager() {
-    return trustManager;
-  }
-
-  public SSLSocketFactory sslSocketFactory() {
-    return sslContext().getSocketFactory();
-  }
-
-  public SSLContext sslContext() {
-    try {
-      SSLContext sslContext = Platform.get().getSSLContext();
-      sslContext.init(new KeyManager[] { keyManager }, new TrustManager[] { trustManager },
-          new SecureRandom());
-      return sslContext;
-    } catch (KeyManagementException e) {
-      throw new AssertionError(e);
-    }
-  }
-
-  public static final class Builder {
-    private @Nullable HeldCertificate heldCertificate;
-    private @Nullable X509Certificate[] intermediates;
-
-    private final List<X509Certificate> trustedCertificates = new ArrayList<>();
-
-    /**
-     * Configure the certificate chain to use when being authenticated. The first certificate is
-     * the held certificate, further certificates are included in the handshake so the peer can
-     * build a trusted path to a trusted root certificate.
-     *
-     * <p>The chain should include all intermediate certificates but does not need the root
-     * certificate that we expect to be known by the remote peer. The peer already has that
-     * certificate so transmitting it is unnecessary.
-     */
-    public Builder heldCertificate(HeldCertificate heldCertificate,
-        X509Certificate... intermediates) {
-      this.heldCertificate = heldCertificate;
-      this.intermediates = intermediates.clone(); // Defensive copy.
-      return this;
+    private HandshakeCertificates(X509KeyManager keyManager, X509TrustManager trustManager) {
+        this.keyManager = keyManager;
+        this.trustManager = trustManager;
     }
 
-    /**
-     * Add a trusted root certificate to use when authenticating a peer. Peers must provide
-     * a chain of certificates whose root is one of these.
-     */
-    public Builder addTrustedCertificate(X509Certificate certificate) {
-      this.trustedCertificates.add(certificate);
-      return this;
+    public X509KeyManager keyManager() {
+        return keyManager;
     }
 
-    /**
-     * Add all of the host platform's trusted root certificates. This set varies by platform
-     * (Android vs. Java), by platform release (Android 4.4 vs. Android 9), and with user
-     * customizations.
-     *
-     * <p>Most TLS clients that connect to hosts on the public Internet should call this method.
-     * Otherwise it is necessary to manually prepare a comprehensive set of trusted roots.
-     *
-     * <p>If the host platform is compromised or misconfigured this may contain untrustworthy root
-     * certificates. Applications that connect to a known set of servers may be able to mitigate
-     * this problem with {@linkplain CertificatePinner certificate pinning}.
-     */
-    public Builder addPlatformTrustedCertificates() {
-      X509TrustManager platformTrustManager = Util.platformTrustManager();
-      Collections.addAll(trustedCertificates, platformTrustManager.getAcceptedIssuers());
-      return this;
+    public X509TrustManager trustManager() {
+        return trustManager;
     }
 
-    public HandshakeCertificates build() {
-      try {
-        X509KeyManager keyManager = newKeyManager(null, heldCertificate, intermediates);
-        X509TrustManager trustManager = newTrustManager(null, trustedCertificates);
-        return new HandshakeCertificates(keyManager, trustManager);
-      } catch (GeneralSecurityException gse) {
-        throw new AssertionError(gse);
-      }
+    public SSLSocketFactory sslSocketFactory() {
+        return sslContext().getSocketFactory();
     }
-  }
+
+    public SSLContext sslContext() {
+        try {
+            SSLContext sslContext = Platform.get().getSSLContext();
+            sslContext.init(new KeyManager[]{keyManager}, new TrustManager[]{trustManager},
+                    new SecureRandom());
+            return sslContext;
+        } catch (KeyManagementException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    public static final class Builder {
+        private @Nullable
+        HeldCertificate heldCertificate;
+        private @Nullable
+        X509Certificate[] intermediates;
+
+        private final List<X509Certificate> trustedCertificates = new ArrayList<>();
+
+        /**
+         * Configure the certificate chain to use when being authenticated. The first certificate is
+         * the held certificate, further certificates are included in the handshake so the peer can
+         * build a trusted path to a trusted root certificate.
+         *
+         * <p>The chain should include all intermediate certificates but does not need the root
+         * certificate that we expect to be known by the remote peer. The peer already has that
+         * certificate so transmitting it is unnecessary.
+         */
+        public Builder heldCertificate(HeldCertificate heldCertificate,
+                                       X509Certificate... intermediates) {
+            this.heldCertificate = heldCertificate;
+            this.intermediates = intermediates.clone(); // Defensive copy.
+            return this;
+        }
+
+        /**
+         * Add a trusted root certificate to use when authenticating a peer. Peers must provide
+         * a chain of certificates whose root is one of these.
+         */
+        public Builder addTrustedCertificate(X509Certificate certificate) {
+            this.trustedCertificates.add(certificate);
+            return this;
+        }
+
+        /**
+         * Add all of the host platform's trusted root certificates. This set varies by platform
+         * (Android vs. Java), by platform release (Android 4.4 vs. Android 9), and with user
+         * customizations.
+         *
+         * <p>Most TLS clients that connect to hosts on the public Internet should call this method.
+         * Otherwise it is necessary to manually prepare a comprehensive set of trusted roots.
+         *
+         * <p>If the host platform is compromised or misconfigured this may contain untrustworthy root
+         * certificates. Applications that connect to a known set of servers may be able to mitigate
+         * this problem with {@linkplain CertificatePinner certificate pinning}.
+         */
+        public Builder addPlatformTrustedCertificates() {
+            X509TrustManager platformTrustManager = Util.platformTrustManager();
+            Collections.addAll(trustedCertificates, platformTrustManager.getAcceptedIssuers());
+            return this;
+        }
+
+        public HandshakeCertificates build() {
+            try {
+                X509KeyManager keyManager = newKeyManager(null, heldCertificate, intermediates);
+                X509TrustManager trustManager = newTrustManager(null, trustedCertificates);
+                return new HandshakeCertificates(keyManager, trustManager);
+            } catch (GeneralSecurityException gse) {
+                throw new AssertionError(gse);
+            }
+        }
+    }
 }
